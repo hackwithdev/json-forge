@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JSON Forge</title>
+  <meta name="description" content="Format, validate, explore, and compare JSON in the browser. Documents stay on your machine.">
+  <link rel="icon" href="Assets/file.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <script>
+    try {
+      var savedTheme = localStorage.getItem("json-forge-theme");
+      if (savedTheme === "light" || savedTheme === "dark") {
+        document.documentElement.dataset.theme = savedTheme;
+      }
+    } catch (error) {}
+  </script>
+  <script type="importmap">
+  {
+    "imports": {
+      "@codemirror/state": "https://esm.sh/@codemirror/state@6.7.6",
+      "@codemirror/view": "https://esm.sh/@codemirror/view@6.43.14?external=@codemirror/state",
+      "@lezer/common": "https://esm.sh/@lezer/common@1.5.3",
+      "@lezer/highlight": "https://esm.sh/@lezer/highlight@1.2.5?external=@lezer/common",
+      "@lezer/lr": "https://esm.sh/@lezer/lr@1.4.11?external=@lezer/common",
+      "@lezer/json": "https://esm.sh/@lezer/json@1.0.3?external=@lezer/lr,@lezer/common",
+      "@codemirror/streamparser": "https://esm.sh/@codemirror/streamparser@6.0.0?external=@lezer/common",
+      "@codemirror/language": "https://esm.sh/@codemirror/language@6.13.1?external=@codemirror/state,@codemirror/view,@lezer/common,@lezer/highlight,@lezer/lr,@codemirror/streamparser",
+      "@codemirror/commands": "https://esm.sh/@codemirror/commands@6.11.1?external=@codemirror/state,@codemirror/view,@codemirror/language,@lezer/common",
+      "@codemirror/search": "https://esm.sh/@codemirror/search@6.7.2?external=@codemirror/state,@codemirror/view",
+      "@codemirror/autocomplete": "https://esm.sh/@codemirror/autocomplete@6.20.3?external=@codemirror/state,@codemirror/view,@codemirror/language,@lezer/common",
+      "@codemirror/lint": "https://esm.sh/@codemirror/lint@6.9.7?external=@codemirror/state,@codemirror/view",
+      "@codemirror/lang-json": "https://esm.sh/@codemirror/lang-json@6.0.2?external=@codemirror/language,@lezer/json",
+      "@codemirror/theme-one-dark": "https://esm.sh/@codemirror/theme-one-dark@6.1.3?external=@codemirror/view,@codemirror/state,@codemirror/language,@lezer/highlight",
+      "codemirror": "https://esm.sh/codemirror@6.0.2?external=@codemirror/autocomplete,@codemirror/commands,@codemirror/language,@codemirror/lint,@codemirror/search,@codemirror/state,@codemirror/view"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" role="img" aria-label="JSON Forge"></span>
+        <div>
+          <h1>JSON Forge</h1>
+          <p>Pretty-print, validate, and compare JSON without leaving the tab.</p>
+        </div>
+      </div>
+      <div class="mode-switch" role="tablist" aria-label="Workspace">
+        <button type="button" id="tab-editor" role="tab" aria-controls="view-editor" aria-selected="true">Editor</button>
+        <button type="button" id="tab-diff" role="tab" aria-controls="view-diff" aria-selected="false">Diff</button>
+      </div>
+      <button type="button" id="theme-toggle" class="theme-toggle" aria-pressed="true">Light theme</button>
+    </header>
+
+    <section id="view-editor" class="workspace" role="tabpanel" aria-labelledby="tab-editor">
+      <div class="pane pane-editor">
+        <div class="toolbar" aria-label="Editor actions">
+          <button type="button" id="format-btn" class="primary" title="Format (Ctrl+Enter)">Format</button>
+          <button type="button" id="minify-btn" title="Minify (Ctrl+Shift+M)">Minify</button>
+          <button type="button" id="sort-btn" title="Sort object keys, then format">Sort keys</button>
+          <label class="field">
+            <span>Indent</span>
+            <select id="indent-select">
+              <option value="2">2 spaces</option>
+              <option value="4">4 spaces</option>
+              <option value="tab">Tab</option>
+            </select>
+          </label>
+          <span class="toolbar-spacer"></span>
+          <button type="button" id="copy-btn">Copy</button>
+          <button type="button" id="upload-btn">Upload</button>
+          <input id="upload-input" type="file" accept=".json,.txt,application/json,text/plain" hidden>
+          <button type="button" id="download-btn">Download</button>
+          <button type="button" id="sample-btn">Sample</button>
+          <button type="button" id="clear-btn">Clear</button>
+        </div>
+        <div id="editor-host" class="editor-host" data-label="JSON editor"></div>
+        <div id="editor-status" class="status-bar" aria-live="polite"></div>
+      </div>
+
+      <aside class="pane pane-side" aria-label="Document tools">
+        <div class="side-switch" role="tablist" aria-label="Side panel">
+          <button type="button" id="side-tree" role="tab" aria-controls="panel-tree" aria-selected="true">Tree</button>
+          <button type="button" id="side-search" role="tab" aria-controls="panel-search" aria-selected="false">Search</button>
+          <button type="button" id="side-stats" role="tab" aria-controls="panel-stats" aria-selected="false">Stats</button>
+        </div>
+
+        <div id="panel-tree" class="side-panel" role="tabpanel" aria-labelledby="side-tree">
+          <div class="panel-tools">
+            <button type="button" id="expand-all">Expand all</button>
+            <button type="button" id="collapse-all">Collapse all</button>
+          </div>
+          <p id="tree-banner" class="banner" hidden></p>
+          <div id="tree-root" class="tree-scroll"></div>
+        </div>
+
+        <div id="panel-search" class="side-panel" role="tabpanel" aria-labelledby="side-search" hidden>
+          <label class="search-field">
+            <span>Search keys and values</span>
+            <input id="search-input" type="search" placeholder="name, true, 42…" autocomplete="off">
+          </label>
+          <p id="search-meta" class="meta"></p>
+          <ul id="search-results" class="result-list"></ul>
+        </div>
+
+        <div id="panel-stats" class="side-panel" role="tabpanel" aria-labelledby="side-stats" hidden>
+          <dl id="stats-list" class="stats"></dl>
+        </div>
+      </aside>
+    </section>
+
+    <section id="view-diff" class="workspace workspace-diff" role="tabpanel" aria-labelledby="tab-diff" hidden>
+      <div class="toolbar diff-toolbar" aria-label="Diff actions">
+        <button type="button" id="diff-compare" class="primary">Compare</button>
+        <button type="button" id="diff-sample">Load sample pair</button>
+        <button type="button" id="diff-swap">Swap sides</button>
+        <label class="check">
+          <input id="diff-sort" type="checkbox" checked>
+          <span>Sort keys before highlighting</span>
+        </label>
+        <span class="toolbar-spacer"></span>
+        <p class="hint">Comparison is structural. Key order alone is not a change.</p>
+      </div>
+      <div class="diff-columns">
+        <div class="pane">
+          <div class="pane-head">
+            <h2>Left</h2>
+            <div class="pane-actions">
+              <button type="button" id="diff-left-upload">Upload</button>
+              <input id="diff-left-file" type="file" accept=".json,.txt,application/json,text/plain" hidden>
+              <button type="button" id="diff-left-copy">Copy</button>
+              <button type="button" id="diff-left-download">Download</button>
+            </div>
+          </div>
+          <div id="diff-left-host" class="editor-host"></div>
+          <div id="diff-left-status" class="status-bar" aria-live="polite"></div>
+        </div>
+        <div class="pane">
+          <div class="pane-head">
+            <h2>Right</h2>
+            <div class="pane-actions">
+              <button type="button" id="diff-right-upload">Upload</button>
+              <input id="diff-right-file" type="file" accept=".json,.txt,application/json,text/plain" hidden>
+              <button type="button" id="diff-right-copy">Copy</button>
+              <button type="button" id="diff-right-download">Download</button>
+            </div>
+          </div>
+          <div id="diff-right-host" class="editor-host"></div>
+          <div id="diff-right-status" class="status-bar" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="diff-results">
+        <div id="diff-summary" class="diff-summary">Paste two JSON documents and compare them.</div>
+        <div id="diff-filters" class="filter-row" hidden></div>
+        <ul id="diff-list" class="result-list diff-list"></ul>
+      </div>
+    </section>
+  </div>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
